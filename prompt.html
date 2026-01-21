@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 3D Asset Gallery (List View)</title>
+    <script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.4.0/model-viewer.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
+        /* กำหนดความสูงของ Model Viewer */
+        model-viewer { 
+            width: 100%; 
+            height: 400px; 
+            background-color: #f1f5f9;
+        }
+        /* ถ้าหน้าจอเล็ก (มือถือ) ให้ Model อยู่บน Prompt อยู่ล่าง */
+        @media (max-width: 768px) {
+            model-viewer { height: 300px; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div class="max-w-7xl mx-auto py-10 px-4">
+        <header class="mb-10 border-b pb-6">
+            <h1 class="text-3xl font-bold text-gray-900">Asset Pipeline Gallery</h1>
+            <p class="text-gray-500 mt-2">Full List: Prompt (Left) vs Model (Right)</p>
+        </header>
+
+        <div id="asset-list" class="space-y-12">
+            </div>
+    </div>
+
+    <script>
+        const PROMPT_DATA = {
+            "01 Seating Module": [ "Create a modular public bench system, 1.8m long x 0.55m deep x 0.45m seat height, with optional 0.35m backrest. Materials: powder-coated steel frame, hardwood slats (teak-like), rounded end caps, anti-theft bolts. Include armrests for accessibility (elderly), center armrest optional. Model as separate parts: frame, slats, armrests, end caps, base plates. Add ground anchoring plates with bolt holes. Clean, realistic, urban streetscape style." ],
+            "02 Shade Structure": [ "Create a pedestrian shade canopy covering a 2m bench zone: roof 3.0m x 2.0m, height 2.6m clear. Steel columns (80mm square) with cantilever beam, UV-resistant roof panels (polycarbonate), integrated gutter and downspout. Add footings/base plates with bolt holes. Separate parts: columns, beams, roof panels, gutter, downspout, bolts." ],
+            "03 Waste Station": [ "Create a public waste station with two bins: Trash + Recycling. Each bin 70L, total width 0.9m, height 1.1m. Include hinged lids for rain/odor, liner rings, clear pictogram labels, and a shared steel frame anchored to ground. Add optional ashtray top module. Separate meshes: frame, bin bodies, lids, liner rings, label plates." ],
+            "04 Scooter Parking and bike": [ "Create a set of 4 inverted-U bike racks, each 0.8m tall, 0.75m wide, spaced 0.9m apart. Include ground mounting plates with bolts. Add one scooter docking rail with wheel guide. Material: galvanized steel with protective coating. Separate meshes: each rack, base plates, bolts." ],
+            "05 Community Notice Board": [ "Create a lockable community notice board: 1.2m wide x 1.6m tall, weather-sealed aluminum frame, tempered glass door, key lock, cork/metal backing panel. Mounted on two posts with base plates. Separate meshes: frame, glass door, hinges, lock, backing, posts." ],
+            "06 Directional Signpost System": [ "Create a directional signpost with 4 arrow blades pointing different directions, each blade 0.6m long. Post height 3.0m. Include icons + blank text panels (no real text). Add reflective strips and mounting brackets. Separate meshes: post, blades, brackets, caps, base plate." ],
+            "07 Area Map “You Are Here” Totem": [ "Create a standing map totem: 0.7m wide x 2.2m tall, angled map panel at 15 degrees, “You Are Here” marker area (blank), protective glass, metal frame, base plinth. Include QR placeholder plate. Separate meshes: frame, map panel, glass, base, fasteners." ],
+            "08 Bollard Set": [ "Create a set of 6 fixed bollards, each 1.0m tall, 0.15m diameter, rounded top, reflective band, base flange anchored with bolts. Spacing 1.2m. Material: steel with protective coating. Separate meshes per bollard and base bolts." ],
+            "09 Handrail": [ "Create a pedestrian guardrail segment 2.0m long, 1.1m tall, with vertical pickets and rounded top rail. Include end posts, base plates, bolt holes. Material: powder-coated steel. Separate meshes: rails, pickets, posts, base plates." ],
+            "10 Pedestrian Light Pole": [ "Create a pedestrian light pole: 4.0m tall, base diameter 0.25m, simple luminaire head with downward shield, maintenance door at base, anchor bolts. Material: aluminum pole, matte finish. Separate meshes: pole, luminaire, base plate, door." ],
+            "11 Smart Pole (Modular)": [ "Create a modular smart pole: 5.0m tall, with stacked modules: CCTV dome (placeholder), Wi-Fi box, environmental sensor box, speaker grille, and an LED info strip (blank). Include internal cable channel and service hatch. Add solar panel ring near top (optional). Separate meshes for each module." ],
+            "12 Planter": [ "Create a raised planter: 1.5m x 0.6m x 0.55m tall, with internal liner, drainage holes, overflow outlet, and a small seating ledge on one side. Material: concrete shell + wood top edge. Separate meshes: planter body, liner, ledge, drain pipe." ],
+            "13 Public Art and Landmark Element": [ "Create an abstract public art landmark, 3.0m tall, durable outdoor material (painted steel). Smooth modern form with base plinth and hidden anchoring. Keep it iconic and photogenic. Separate meshes: sculpture, base plinth, anchor plate." ],
+            "14 Pavilion": [ "Create a small open-air pavilion (sala), 4m x 4m footprint, raised platform 0.3m, roof height 3.5m. Modern Thai-inspired roof with simple geometry, 4–6 columns, wood floor planks, shaded seating edge. Include stairs and ramp option. Separate meshes: roof, columns, platform, steps, rail." ],
+            "15 Outdoor Table": [ "Create an outdoor picnic table set: table length 1.8m, width 0.75m, bench seats on both sides, seat height 0.45m. Steel frame + wood slats, rounded edges, anti-theft bolts. Separate meshes: tabletop slats, seat slats, frame, base plates." ],
+            "16 Drinking Water Refill Station": [ "Create a drinking water station: 1.1m tall pedestal with bottle refill spout + small drinking fountain basin, drain outlet, maintenance door, filtered unit box, and splash guard. Include ground anchoring. Stainless steel look, clean public infrastructure style. Separate meshes: body, basin, spouts, buttons, door." ],
+            "17 bike rack": [ "Create a bike rack shaped as a simple iconic outline (e.g., looped silhouette), still functional for locking. Height 0.8m, thick steel tube, base plates." ],
+            "18 Mailbox": [ "Create a standalone public mailbox unit: 1.4m tall, 0.5m wide, 0.4m deep, rounded top, mail slot with rain hood, lockable service door. Mounted to a heavy base plinth with anchoring bolts. No logos. Separate meshes: body, slot flap, hood, door, lock area, base." ]
+        };
+
+        const listContainer = document.getElementById('asset-list');
+
+        function init() {
+            Object.keys(PROMPT_DATA).forEach((category) => {
+                const promptText = PROMPT_DATA[category][0];
+                
+                // Path Logic: ./Model/Category/01.glb
+                const filePath = `./Model/${category}/01.glb`;
+
+                // สร้าง Row Container (ใช้ flex-row เพื่อแบ่งซ้ายขวา)
+                const row = document.createElement('div');
+                row.className = "flex flex-col md:flex-row bg-white rounded-xl shadow-md overflow-hidden border border-gray-200";
+
+                row.innerHTML = `
+                    <div class="w-full md:w-2/5 p-8 flex flex-col justify-center border-b md:border-b-0 md:border-r border-gray-100">
+                        <h2 class="text-xl font-bold text-blue-800 mb-4">${category}</h2>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+                            <p class="text-sm text-gray-700 leading-relaxed font-mono" id="text-${category.replace(/\s/g, '')}">
+                                ${promptText}
+                            </p>
+                        </div>
+                        <div class="flex items-center justify-between mt-auto">
+                            <span class="text-xs text-gray-400 font-mono">File: ${filePath}</span>
+                            <button onclick="copyToClipboard('${promptText.replace(/'/g, "\\'")}', this)" 
+                                class="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded transition">
+                                Copy Prompt
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="w-full md:w-3/5 relative bg-gray-100">
+                        <model-viewer 
+                            src="${filePath}" 
+                            alt="3D Model of ${category}"
+                            camera-controls 
+                            auto-rotate 
+                            shadow-intensity="1"
+                            loading="lazy"
+                            ar
+                            class="w-full h-full">
+                            
+                            <div slot="poster" class="flex items-center justify-center h-full text-gray-400">
+                                <span class="bg-white px-4 py-2 rounded shadow-sm opacity-80">Loading 3D Model...</span>
+                            </div>
+                        </model-viewer>
+                    </div>
+                `;
+
+                listContainer.appendChild(row);
+            });
+        }
+
+        // ฟังก์ชั่น Copy
+        window.copyToClipboard = (text, btn) => {
+            navigator.clipboard.writeText(text);
+            const originalText = btn.innerText;
+            btn.innerText = "Copied!";
+            btn.classList.replace("bg-blue-600", "bg-green-600");
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.replace("bg-green-600", "bg-blue-600");
+            }, 2000);
+        };
+
+        init();
+    </script>
+</body>
+</html>

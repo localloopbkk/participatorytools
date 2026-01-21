@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Street Furniture Editor (Fixed Submit & Data)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;600;800&display=swap');
+    :root{ --leftW: 240px; --rightW: 220px; --edgeGap: 12px; }
+    html,body{ margin:0; height:100%; font-family:'Work Sans', sans-serif; overflow:hidden; background:#000; cursor: url('color-arctic-lime-pointer.png'), auto; }
+    button, .item, canvas, input, select { cursor: url('color-arctic-lime-pointer.png'), pointer !important; }
+    
+    body{
+      background:
+        linear-gradient(180deg, rgba(0,0,0,.3), rgba(0,0,0,.1)),
+        url('Gemini_Generated_Image_eg5v3ceg5v3ceg5v.png') center/cover no-repeat;
+    }
+
+    #container{width:100vw;height:100vh}
+    
+    .sidebar{ position:fixed; top:var(--edgeGap); bottom:var(--edgeGap); padding:20px; display:flex; flex-direction:column; gap:14px; overflow:auto; z-index:9500; color:#fff; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    #leftbar{ left:var(--edgeGap); width:var(--leftW); }
+    #rightbar{ right:var(--edgeGap); width:var(--rightW); }
+    #rightbar .panel:first-of-type{ margin-top:100px; }
+    .brand{ position:fixed; top:16px; right:calc(var(--rightW) + var(--edgeGap) + -170px); z-index:9999; pointer-events:none; width:200px; filter: drop-shadow(0 2px 6px rgba(0,0,0,.4)); }
+    .hud{ position:fixed; left:30%; transform:translateX(-30%); bottom: calc(var(--edgeGap) + 6px); top:auto; display:flex; gap:12px; z-index:9600; pointer-events:auto; max-width: min(92vw, 1200px); flex-wrap:wrap; justify-content:center; }
+    .group{display:flex;flex-direction:column;gap:6px}
+    .group-title{font-weight:700; letter-spacing:.6px; font-size:13px; color:#ffffff; opacity:.85; margin-top:8px;}
+    .item{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px; border-radius:12px; font-size:14px; background: rgba(255,255,255,.12); color:#ffffff; border:1px solid rgba(255,255,255,.22); transition:.15s ease; box-shadow:0 1px 0 rgba(0,0,0,.08); }
+    .item:hover{ background: rgba(255,255,255,.18); }
+    .item.active{ background:#ffffff !important; color:#666666 !important; border-color:#ffffff !important; }
+    .item .count{opacity:.9} .sep{height:10px}
+    .panel{display:flex;flex-direction:column;gap:10px}
+    .ctrl{ padding:10px 12px; border:none; border-radius:12px; color:#fff; font-size:14px; background: rgba(255,255,255,.12); text-align:left; border:1px solid rgba(255,255,255,.22); transition:.15s ease; }
+    .ctrl:hover{ background: rgba(255,255,255,.18); }
+    .ctrl.delete-btn { background: rgba(255, 60, 60, 0.25); border: 1px solid rgba(255, 60, 60, 0.4); font-weight: 600; color: #ffcccc; }
+    .ctrl.delete-btn:hover { background: rgba(255, 60, 60, 0.4); color: #fff; }
+    .ctrl.music-on { background: #aaffaa33; border-color: #aaffaa; color: #eeffee; font-weight: bold; }
+    .status{ margin-top:8px; padding:10px 12px; border-radius:12px; background: rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); color:#f5f5f5; font-size:13px; line-height:1.5; }
+    .prop-panel { display:none; flex-direction:column; gap:8px; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); }
+    .prop-row { display:flex; align-items:center; justify-content:space-between; font-size:13px; }
+    input[type="color"] { border:none; width:40px; height:24px; background:none; padding:0; }
+    canvas{display:block} .pad-left {padding-left: calc(var(--leftW) + var(--edgeGap)*2 + 8px);} .pad-right {padding-right:calc(var(--rightW) + var(--edgeGap)*2 + 8px);}
+    input[type="range"]{width:100%} select, input[type="number"]{border-radius:10px; border:1px solid rgba(255,255,255,.25); background:rgba(0,0,0,.2); color:#fff; padding:6px 8px; outline:none}
+    .bottom-hud{ position:fixed; left:50%; transform:translateX(-50%); bottom: var(--edgeGap); z-index:9700; pointer-events:none; }
+    .cam-pill{ display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border-radius:999px; background: rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); backdrop-filter: blur(6px); color:#fff; font-weight:700; box-shadow:0 8px 24px rgba(0,0,0,.25); }
+    body::after{content:'';position:fixed;left:0;right:0;bottom:0;height:180px;background:url("images/clouds.png") center bottom/cover no-repeat;z-index:9000;pointer-events:none;}
+  </style>
+</head>
+<body>
+  <img class="brand" id="mainLogo" src="images/logo.png" alt="LocalLoop BKK">
+  <audio id="bgMusic" loop>
+    <source src="https://edhwbkcmxgisqnznryhp.supabase.co/storage/v1/object/public/models/Models/music.mp3" type="audio/mpeg">
+  </audio>
+  <div class="hud" id="hud"></div>
+
+  <aside id="leftbar" class="sidebar">
+    <div class="group" id="menu"></div>
+  </aside>
+
+  <aside id="rightbar" class="sidebar">
+    <div class="panel">
+      <button class="ctrl" id="btn_music">🔇 Music: OFF</button>
+      <button class="ctrl warn"      id="btn_snap">📷 Snapshot</button>
+      <button class="ctrl"           id="btn_submit">✔ Submit (Cloud)</button>
+      <button class="ctrl secondary" id="btn_undo">⟲ Undo</button>
+    </div>
+    <div class="panel" id="propPanelWrapper" style="display:none">
+       <div class="status" style="margin-bottom:8px; margin-top:0; background:rgba(255,255,255,0.15)"><b>✨ Selected: <span id="selNameDisp"></span></b></div>
+       <button class="ctrl delete-btn" id="btn_delete_sel">🗑 Delete Object</button>
+       <div class="prop-panel" style="display:flex; margin-top:8px">
+         <div class="prop-row"><span>🎨 Color</span><input type="color" id="objColor" value="#ffffff"></div>
+         <div class="prop-row" style="margin-top:8px"><span>📏 Scale</span><input type="number" id="objScale" step="0.1" value="1.0" style="width:70px"></div>
+       </div>
+    </div>
+    <div class="panel" style="margin-top:8px">
+      <div class="status" style="margin-bottom:8px; margin-top:0"><b>Rotation</b></div>
+      <button class="ctrl" id="btn_rot_holdL">⟲ Rotate Left (hold)</button>
+      <button class="ctrl" id="btn_rot_holdR">⟳ Rotate Right (hold)</button>
+      <input id="rotSlider" type="range" min="0" max="360" value="0" step="1" style="margin-top:8px" />
+      <div class="status" style="margin-top:6px">
+        <label style="display:block;margin-bottom:6px">Axis: <select id="rotAxis"><option value="z">Yaw (Z)</option><option value="y">Pitch (Y)</option><option value="x">Roll (X)</option></select></label>
+        <b>Angle (<span id="axisLabel">Z</span>):</b> <span id="rotDeg">0°</span>
+      </div>
+    </div>
+    <div class="panel" style="margin-top:8px">
+      <button class="ctrl" id="btn_grid_minus">➖ Grid −</button>
+      <button class="ctrl" id="btn_grid_plus">➕ Grid +</button>
+      <button class="ctrl secondary" id="btn_grid_random">🎲 Random Grid: OFF</button>
+    </div>
+    <div class="status" id="statusBox">
+      <div><b>Total placed:</b> <span id="totalPlaced">0</span></div>
+      <div><b>Grid size:</b> <span id="gridSizeLabel">20</span> cells</div>
+    </div>
+  </aside>
+
+  <div id="container" class="pad-left pad-right"></div>
+  <div class="bottom-hud" id="bottomHud"><div class="cam-pill">🎥 Camera View&nbsp;<span id="camYaw" class="mono">0°</span></div></div>
+
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.119.1/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.119.1/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.119.1/examples/jsm/loaders/GLTFLoader.js';
+    import { DRACOLoader } from 'https://unpkg.com/three@0.119.1/examples/jsm/loaders/DRACOLoader.js';
+
+    /* ---------- 🔥 API CONFIG 🔥 ---------- */
+    const GAS_ID = 'AKfycbwTQ1nb3tIIZC3F6b41P9iDDtd-hSELK5MCrBeXTl2O1gmoPEU8lpr6WnAPlcQ3baYHHg';
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/' + GAS_ID + '/exec';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVkaHdia2NteGdpc3Fuem5yeWhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0MjkyMzAsImV4cCI6MjA4NDAwNTIzMH0.GUppQsGOW7ypR-skf8waGSX6ouxDUnnxkY5Ep-Tn1rQ'; 
+    const SUPABASE_URL = 'https://edhwbkcmxgisqnznryhp.supabase.co';
+    const SUPABASE_BUCKET = 'submissions'; 
+
+    const bgImg = new Image();
+    bgImg.crossOrigin = "anonymous";
+    bgImg.src = 'Gemini_Generated_Image_eg5v3ceg5v3ceg5v.png';
+
+    const bgMusic = document.getElementById('bgMusic');
+    const btnMusic = document.getElementById('btn_music');
+    let isMusicPlaying = false; bgMusic.volume = 0.4; 
+    btnMusic.addEventListener('click', () => {
+      if(isMusicPlaying){ bgMusic.pause(); btnMusic.textContent = "🔇 Music: OFF"; btnMusic.classList.remove('music-on'); } 
+      else { bgMusic.play().then(()=>{ btnMusic.textContent = "🎵 Music: ON"; btnMusic.classList.add('music-on'); }).catch(err => { console.warn(err); }); }
+      isMusicPlaying = !isMusicPlaying;
+    });
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 10, 10000000); 
+    camera.position.set(5000, -5000, 4000); 
+    camera.up.set(0, 0, 1);
+
+    const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, logarithmicDepthBuffer:true});
+    renderer.setSize(innerWidth,innerHeight); renderer.setPixelRatio(devicePixelRatio); 
+    renderer.setClearColor(0x000000, 0); 
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    document.getElementById('container').appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.screenSpacePanning = false; 
+    controls.minDistance = 500;
+    controls.maxDistance = 500000;
+    controls.maxPolarAngle = Math.PI / 1.8;
+
+    function getMouseNDC(e){ const r = renderer.domElement.getBoundingClientRect(); return new THREE.Vector2(((e.clientX - r.left)/r.width)*2-1, -((e.clientY - r.top)/r.height)*2+1); }
+    function dataURLtoBlob(dataurl) { var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n); while(n--){ u8arr[n] = bstr.charCodeAt(n); } return new Blob([u8arr], {type:mime}); }
+    
+    function capturePNG(){
+      renderer.render(scene, camera);
+      const canvas = document.createElement('canvas');
+      canvas.width = renderer.domElement.width;
+      canvas.height = renderer.domElement.height;
+      const ctx = canvas.getContext('2d');
+      if (bgImg.complete && bgImg.naturalWidth > 0) {
+          const w = canvas.width, h = canvas.height;
+          const iw = bgImg.naturalWidth, ih = bgImg.naturalHeight;
+          const ratio = Math.max(w / iw, h / ih);
+          const nw = iw * ratio, nh = ih * ratio;
+          const nx = (w - nw) / 2, ny = (h - nh) / 2;
+          ctx.drawImage(bgImg, nx, ny, nw, nh);
+      }
+      const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      grad.addColorStop(0, "rgba(0,0,0,0.3)"); grad.addColorStop(1, "rgba(0,0,0,0.1)");
+      ctx.fillStyle = grad; ctx.fillRect(0,0, canvas.width, canvas.height);
+      ctx.drawImage(renderer.domElement, 0, 0);
+      return canvas.toDataURL('image/png');
+    }
+
+    const stars = (() => {
+      const g = new THREE.BufferGeometry(); const COUNT = 3000, spread = 50000; const p = new Float32Array(COUNT*3);
+      for(let i=0;i<COUNT;i++){ p[i*3]=(Math.random()*2-1)*spread; p[i*3+1]=(Math.random()*2-1)*spread; p[i*3+2]=(Math.random()*2-1)*spread; }
+      g.setAttribute('position', new THREE.BufferAttribute(p,3));
+      const m = new THREE.PointsMaterial({size:10, sizeAttenuation:true, color:0xffffff, transparent:true, opacity:.6});
+      const pts = new THREE.Points(g,m); scene.add(pts);
+      return { update(){ pts.rotation.z+=0.0001; } };
+    })();
+
+    // --- GRID LOGIC ---
+    const UNIT_PER_M = 1000;
+    let gridSize = 20, boxSize = UNIT_PER_M;
+    let grid = new THREE.GridHelper(gridSize*boxSize, gridSize, 0x444444, 0x333333); 
+    grid.rotation.x = Math.PI/2;
+    scene.add(grid);
+
+    const ground = new THREE.Mesh(new THREE.PlaneBufferGeometry(gridSize*boxSize * 10, gridSize*boxSize * 10), new THREE.MeshBasicMaterial({visible:false})); 
+    scene.add(ground);
+    
+    function refreshGridLabels(){ document.getElementById('gridSizeLabel').textContent = gridSize; }
+
+    function rebuildGrid(){
+      scene.remove(grid); 
+      grid = new THREE.GridHelper(gridSize*boxSize, gridSize, 0x444444, 0x333333);
+      grid.rotation.x = Math.PI/2; 
+      scene.add(grid); 
+      ground.geometry = new THREE.PlaneBufferGeometry(gridSize*boxSize * 10, gridSize*boxSize * 10);
+      refreshGridLabels();
+    }
+
+    document.getElementById('btn_grid_plus').addEventListener('click', () => { gridSize += 10; rebuildGrid(); });
+    document.getElementById('btn_grid_minus').addEventListener('click', () => { if (gridSize > 10) { gridSize -= 10; rebuildGrid(); } });
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.5));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2); dirLight.position.set(5000, 5000, 5000); scene.add(dirLight);
+
+    const dracoLoader = new DRACOLoader(); dracoLoader.setDecoderPath('https://unpkg.com/three@0.119.1/examples/js/libs/draco/gltf/');
+    const loader = new GLTFLoader(); loader.setDRACOLoader(dracoLoader);
+    const BASE_URL = 'https://edhwbkcmxgisqnznryhp.supabase.co/storage/v1/object/public/models/Models/';
+
+    /* ---------- 🔥 FIXED: MANHATTAN LOADER + DIMMER 🔥 ---------- */
+    function loadManhattan() {
+      const fileName = 'manhattan.glb';
+      console.log("Starting to load:", fileName);
+      
+      loader.load(BASE_URL + fileName, (gltf) => {
+        const city = gltf.scene;
+        scene.add(city);
+        
+        city.rotation.x = Math.PI / 2;
+
+        // Darken Manhattan materials
+        city.traverse((node) => {
+          if (node.isMesh) {
+             // Clone material to ensure we don't affect shared instances (safety)
+             node.material = node.material.clone(); 
+             // Reduce color brightness by scalar (0.3 = 30% brightness)
+             node.material.color.setScalar(0.3);
+          }
+        });
+
+        const box = new THREE.Box3().setFromObject(city);
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        box.getSize(size);
+        box.getCenter(center);
+
+        const scaleFactor = (gridSize * boxSize / Math.max(size.x, size.y)) * 5;
+        city.scale.setScalar(scaleFactor);
+        
+        city.position.set(-center.x * scaleFactor, -center.y * scaleFactor, -50);
+        console.log("Manhattan Loaded & Darkened Successfully!");
+      }, 
+      (xhr) => { if(xhr.total > 0) console.log((xhr.loaded / xhr.total * 100) + '% loaded'); },
+      (error) => { 
+        console.error("Error loading Manhattan:", error);
+        loader.load(BASE_URL + 'earth.glb', g => { scene.add(g.scene); g.scene.rotation.x = Math.PI/2; g.scene.scale.setScalar(5000); });
+      });
+    }
+
+    loadManhattan();
+
+    // --- OTHER OBJECTS ---
+    const GROUPS = {
+      '01 Seating Module': ['01 Seating Module::01','01 Seating Module::02','01 Seating Module::03'],
+      '02 Shade Structure': ['02 Shade Structure::01','02 Shade Structure::02','02 Shade Structure::03'],
+      '03 Waste Station': ['03 Waste Station::01','03 Waste Station::02','03 Waste Station::03'],
+      '04 Scooter Parking and bike': ['04 Scooter Parking and bike::01','04 Scooter Parking and bike::02','04 Scooter Parking and bike::03'],
+      '05 Community Notice Board': ['05 Community Notice Board::01','05 Community Notice Board::02','05 Community Notice Board::03'],
+      '06 Directional Signpost System': ['06 Directional Signpost System::01','06 Directional Signpost System::02','06 Directional Signpost System::03'],
+      '07 Area Map You Are Here Totem': ['07 Area Map You Are Here Totem::01','07 Area Map You Are Here Totem::02','07 Area Map You Are Here Totem::03'],
+      '08 Bollard Set': ['08 Bollard Set::01','08 Bollard Set::02','08 Bollard Set::03'],
+      '09 Handrail': ['09 Handrail::01','09 Handrail::02','09 Handrail::03'],
+      '10 Pedestrian Light Pole': ['10 Pedestrian Light Pole::01','10 Pedestrian Light Pole::02','10 Pedestrian Light Pole::03'],
+      '11 Smart Pole (Modular)': ['11 Smart Pole (Modular)::01','11 Smart Pole (Modular)::02','11 Smart Pole (Modular)::03'],
+      '12 Planter': ['12 Planter::01','12 Planter::02','12 Planter::03'],
+      '13 Public Art and Landmark Element': ['13 Public Art and Landmark Element::01','13 Public Art and Landmark Element::02','13 Public Art and Landmark Element::03'],
+      '14 Pavilion': ['14 Pavilion::01','14 Pavilion::02','14 Pavilion::03'],
+      '15 Outdoor Table': ['15 Outdoor Table::01','15 Outdoor Table::02','15 Outdoor Table::03'],
+      '16 Drinking Water Refill Station': ['16 Drinking Water Refill Station::01','16 Drinking Water Refill Station::02','16 Drinking Water Refill Station::03'],
+      '17 bike rack': ['17 bike rack::01','17 bike rack::02','17 bike rack::03'],
+      '18 Mailbox': ['18 Mailbox::01','18 Mailbox::02','18 Mailbox::03']
+    };
+
+    const GROUP_TARGETS_M = {
+      '01 Seating Module': { short: 0.60, long: 1.60 }, '02 Shade Structure': { short: 3.00, long: 3.00 },
+      '03 Waste Station': { short: 0.80, long: 0.80 }, '04 Scooter Parking and bike': { short: 1.20, long: 2.40 },
+      '05 Community Notice Board': { short: 0.40, long: 1.20 }, '06 Directional Signpost System': { short: 0.40, long: 0.40 },
+      '07 Area Map You Are Here Totem': { short: 0.60, long: 0.60 }, '08 Bollard Set': { short: 0.25, long: 0.25 },
+      '09 Handrail': { short: 0.10, long: 2.00 }, '10 Pedestrian Light Pole': { short: 0.40, long: 0.40 },
+      '11 Smart Pole (Modular)': { short: 0.50, long: 0.50 }, '12 Planter': { short: 0.80, long: 0.80 },
+      '13 Public Art and Landmark Element': { short: 1.50, long: 1.50 }, '14 Pavilion': { short: 4.00, long: 6.00 },
+      '15 Outdoor Table': { short: 0.80, long: 1.80 }, '16 Drinking Water Refill Station': { short: 0.60, long: 0.60 },
+      '17 bike rack': { short: 0.60, long: 2.00 }, '18 Mailbox': { short: 0.50, long: 0.50 }
+    };
+
+    function getGroupTitleByKey(key){ for (const [title, list] of Object.entries(GROUPS)) { if (list.includes(key)) return title; } return null; }
+    function computeBaseScale(obj, key){
+      const title = getGroupTitleByKey(key); const t = title ? GROUP_TARGETS_M[title] : null; if(!t) return 1;
+      const box = new THREE.Box3().setFromObject(obj); const size = box.getSize(new THREE.Vector3());
+      const longNow = Math.max(size.x, size.y); const targetLong = (t.long ?? 1) * UNIT_PER_M;
+      return longNow > 0 ? (targetLong / longNow) : 1;
+    }
+
+    const templates={}, counts={}, buttons={}, modelNames=[...new Set(Object.values(GROUPS).flat())];
+    modelNames.forEach(n=>counts[n]=0);
+
+    const load = (name, filePath) => {
+      const finalUrl = BASE_URL + encodeURI(filePath.replace(/^Model\/|^Models\/|^MODEL\//, ''));
+      loader.load(finalUrl, (gltf) => {
+        const obj = gltf.scene; obj.rotation.x = Math.PI / 2; 
+        const box = new THREE.Box3().setFromObject(obj); const center = box.getCenter(new THREE.Vector3()); const min = box.min.clone();
+        const wrap = new THREE.Group(); wrap.add(obj); obj.position.set(-center.x, -center.y, -min.z);
+        wrap.traverse(n => { if(n.isMesh) { n.castShadow = true; n.receiveShadow = true; if(n.material) { n.material = n.material.clone(); } } });
+        templates[name] = wrap;
+      });
+    };
+    
+    Object.entries(GROUPS).forEach(([groupName, itemKeys]) => {
+      itemKeys.forEach(key => {
+        const id = key.split('::')[1];
+        load(key, `Model/${groupName}/${id}.glb`);
+      });
+    });
+
+    const menu = document.getElementById('menu'); let activeKey = null;
+    const makeItem = (key) => {
+      const el = document.createElement('div'); el.className = 'item';
+      el.innerHTML = `<span>${key.split('::')[1]}</span><span class="count" id="count_${key}">(0)</span>`;
+      el.addEventListener('click', ()=>{ 
+         if(!templates[key]){ alert("Loading..."); return; }
+         activeKey = key; document.getElementById('selNameDisp').textContent = key.replace('::',' / ');
+         Object.values(buttons).forEach(b=>b.classList.remove('active')); el.classList.add('active'); setSelected(null);
+      });
+      buttons[key]=el; return el;
+    };
+    Object.entries(GROUPS).forEach(([title, items], idx)=>{
+      const wrap = document.createElement('div'); wrap.className='group';
+      wrap.appendChild(Object.assign(document.createElement('div'),{className:'group-title',textContent:title}));
+      items.forEach(k=>wrap.appendChild(makeItem(k)));
+      menu.appendChild(wrap);
+    });
+
+    const placedStack=[]; let totalPlaced=0;
+    const updateCount = (key) => { if(document.getElementById('count_'+key)) document.getElementById('count_'+key).textContent = `(${counts[key]})`; document.getElementById('totalPlaced').textContent = totalPlaced.toString(); };
+    
+    document.getElementById('btn_undo').addEventListener('click', ()=>{ if(!placedStack.length) return; const obj = placedStack.pop(); const type = obj.userData.type; scene.remove(obj); counts[type]--; totalPlaced--; updateCount(type); if(selected===obj) setSelected(null); });
+    document.getElementById('btn_snap').addEventListener('click', ()=>{ const url=capturePNG(); const link=document.createElement('a'); link.download='capture.png'; link.href=url; link.click(); });
+
+    let selected=null, helper=null, ROT_AXIS='z';
+    const rotSlider=document.getElementById('rotSlider');
+    const colorInput = document.getElementById('objColor');
+    
+    function setSelected(obj) {
+      if(helper){ scene.remove(helper); helper=null; } selected=obj||null;
+      if(selected){
+        document.getElementById('propPanelWrapper').style.display='block'; helper=new THREE.BoxHelper(selected,0x62d0ff); scene.add(helper);
+        rotSlider.value = Math.round(THREE.MathUtils.radToDeg(selected.rotation[ROT_AXIS]));
+        document.getElementById('selNameDisp').textContent = selected.userData.type.split('::')[1];
+        document.getElementById('objScale').value = (selected.userData.userScaleMul||1).toFixed(2);
+        
+        // --- Color Picker Update ---
+        let foundColor = '#ffffff';
+        selected.traverse(c => {
+           if(c.isMesh && c.material && c.material.color) {
+               foundColor = '#' + c.material.color.getHexString();
+           }
+        });
+        colorInput.value = foundColor;
+
+      } else { document.getElementById('propPanelWrapper').style.display='none'; }
+    }
+
+    // --- 🔥 ADDED: Color Picker Logic ---
+    colorInput.addEventListener('input', (e) => {
+        if(!selected) return;
+        const hex = e.target.value;
+        selected.traverse(child => {
+            if(child.isMesh) {
+                child.material.color.set(hex);
+            }
+        });
+    });
+
+    document.getElementById('btn_delete_sel').addEventListener('click', ()=>{ if(!selected)return; scene.remove(selected); if(helper)scene.remove(helper); const type=selected.userData.type; counts[type]--; totalPlaced--; updateCount(type); placedStack.splice(placedStack.indexOf(selected),1); setSelected(null); });
+    document.getElementById('objScale').addEventListener('input', e=>{ if(!selected)return; const mul=parseFloat(e.target.value); if(mul>0){ selected.userData.userScaleMul=mul; selected.scale.setScalar((selected.userData.baseScale||1)*mul); if(helper)helper.update(); } });
+
+    let isDragging=false, dragItem=null; const raycaster=new THREE.Raycaster();
+    renderer.domElement.addEventListener('mousedown', e=>{ 
+      const m=getMouseNDC(e); raycaster.setFromCamera(m,camera); 
+      const hits=raycaster.intersectObjects(scene.children,true);
+      let pick=null; for(const h of hits){ let n=h.object; while(n&&n!==scene){if(n.userData.type){pick=n;break;} n=n.parent;} if(pick)break; }
+      if(pick){isDragging=true; dragItem=pick; controls.enabled=false; setSelected(pick);}
+    });
+    renderer.domElement.addEventListener('mousemove', e=>{ 
+      if(!isDragging||!dragItem)return; 
+      const m=getMouseNDC(e); raycaster.setFromCamera(m,camera); 
+      const hit=raycaster.intersectObject(ground)[0]; 
+      if(hit){ dragItem.position.set(Math.round(hit.point.x/50)*50, Math.round(hit.point.y/50)*50, 0); if(helper)helper.update(); } 
+    });
+    renderer.domElement.addEventListener('mouseup', ()=>{ isDragging=false; dragItem=null; controls.enabled=true; });
+
+    renderer.domElement.addEventListener('dblclick', e=>{ 
+      if(!activeKey)return; 
+      const m=getMouseNDC(e); raycaster.setFromCamera(m,camera); 
+      const hit=raycaster.intersectObject(ground)[0]; 
+      if(!hit)return;
+      const md=templates[activeKey].clone(true); 
+      const base = computeBaseScale(md, activeKey);
+      md.userData.baseScale = base; md.userData.userScaleMul = 1; md.scale.setScalar(base);
+      md.position.set(Math.round(hit.point.x/100)*100, Math.round(hit.point.y/100)*100, 0); 
+      md.userData.type=activeKey; scene.add(md); placedStack.push(md); 
+      counts[activeKey]++; totalPlaced++; updateCount(activeKey); setSelected(md); 
+    });
+
+    /* ---------- 🔥 RESTORED: SUBMIT LOGIC (FIXED) 🔥 ---------- */
+    async function uploadToSupabase(blob) {
+      const fileName = `snap_${Date.now()}_${Math.random().toString(36).substr(2,5)}.png`;
+      const url = `${SUPABASE_URL}/storage/v1/object/${SUPABASE_BUCKET}/${fileName}`;
+      
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'image/png'
+        },
+        body: blob
+      });
+      
+      if (!resp.ok) throw new Error("Supabase Upload Failed");
+      return `${SUPABASE_URL}/storage/v1/object/public/${SUPABASE_BUCKET}/${fileName}`;
+    }
+
+    async function logToGoogleSheets(publicUrl) {
+       // --- NEW STRATEGY: Send data as URLSearchParams (Form Data) to ensure Google Sheets reads it ---
+       // This works even with no-cors better than JSON for many GAS scripts.
+       
+       const params = new URLSearchParams();
+       params.append("timestamp", new Date().toISOString());
+       params.append("totalPlaced", totalPlaced.toString());
+       params.append("imageUrl", publicUrl);
+       
+       // Flatten counts into the main params so GAS can read them as individual columns if needed
+       Object.keys(counts).forEach(key => {
+           params.append(key, counts[key].toString());
+       });
+       
+       // Also send the JSON string just in case the script prefers parsing 'json_data'
+       params.append("json_data", JSON.stringify({
+           timestamp: new Date().toISOString(),
+           totalPlaced: totalPlaced,
+           imageUrl: publicUrl,
+           items: counts
+       }));
+
+       await fetch(GOOGLE_SCRIPT_URL, {
+           method: 'POST',
+           mode: 'no-cors', 
+           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+           body: params
+       });
+    }
+
+    document.getElementById('btn_submit').addEventListener('click', async () => {
+        const btn = document.getElementById('btn_submit');
+        const originalText = btn.textContent;
+        
+        try {
+            btn.textContent = "⏳ Uploading...";
+            btn.disabled = true;
+
+            // 1. Capture & Convert
+            const dataUrl = capturePNG();
+            const blob = dataURLtoBlob(dataUrl);
+
+            // 2. Upload Image
+            const publicUrl = await uploadToSupabase(blob);
+            console.log("Uploaded:", publicUrl);
+
+            // 3. Log to Sheets
+            btn.textContent = "⏳ Saving...";
+            await logToGoogleSheets(publicUrl);
+
+            // 4. Redirect
+            btn.textContent = "✔ Done!";
+            setTimeout(() => {
+                window.location.href = 'gallery.html';
+            }, 1000);
+
+        } catch (err) {
+            console.error(err);
+            alert("Error submitting: " + err.message);
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }
+    });
+
+    window.addEventListener('resize', ()=>{ renderer.setSize(innerWidth,innerHeight); camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); });
+
+    let rotDir=0;
+    document.getElementById('btn_rot_holdL').onmousedown=()=>rotDir=-1; document.getElementById('btn_rot_holdL').onmouseup=()=>rotDir=0;
+    document.getElementById('btn_rot_holdR').onmousedown=()=>rotDir=1; document.getElementById('btn_rot_holdR').onmouseup=()=>rotDir=0;
+
+    (function animate(){
+      requestAnimationFrame(animate); 
+      stars.update(); controls.update();
+      if(selected&&rotDir!==0){ selected.rotation[ROT_AXIS]+=0.05*rotDir; rotSlider.value=Math.round(THREE.MathUtils.radToDeg(selected.rotation[ROT_AXIS])); if(helper)helper.update(); }
+      renderer.render(scene,camera);
+    })();
+  </script>
+</body>
+</html>
